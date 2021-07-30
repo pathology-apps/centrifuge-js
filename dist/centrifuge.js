@@ -118,6 +118,7 @@ var Centrifuge = /*#__PURE__*/function (_EventEmitter) {
       websocket: null,
       sockjs: null,
       xmlhttprequest: null,
+      middleware: [],
       minRetry: 1000,
       maxRetry: 20000,
       timeout: 5000,
@@ -183,6 +184,15 @@ var Centrifuge = /*#__PURE__*/function (_EventEmitter) {
     key: "setSubscribeParams",
     value: function setSubscribeParams(params) {
       this._config.subscribeParams = params;
+    }
+  }, {
+    key: "setMiddleware",
+    value: function setMiddleware() {
+      for (var _len = arguments.length, fns = new Array(_len), _key = 0; _key < _len; _key++) {
+        fns[_key] = arguments[_key];
+      }
+
+      this._config.middleware = fns;
     }
   }, {
     key: "_ajax",
@@ -917,6 +927,23 @@ var Centrifuge = /*#__PURE__*/function (_EventEmitter) {
       this._restartPing();
     }
   }, {
+    key: "_hookMiddleware",
+    value: function _hookMiddleware(data) {
+      var middleware = this._config.middleware;
+
+      if (Array.isArray(middleware)) {
+        middleware.forEach(function (mw) {
+          if (typeof mw === 'function') {
+            mw(data);
+          }
+        });
+      }
+
+      if (typeof middleware === 'function') {
+        middleware(data);
+      }
+    }
+  }, {
     key: "_dispatchSynchronized",
     value: function _dispatchSynchronized(replies, finishDispatch) {
       var _this6 = this;
@@ -927,6 +954,7 @@ var Centrifuge = /*#__PURE__*/function (_EventEmitter) {
         if (replies.hasOwnProperty(i)) {
           p = p.then(function () {
             _this6._hookMiddleware(replies[i]);
+
             return _this6._dispatchReply(replies[i]);
           });
         }
