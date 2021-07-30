@@ -1,3 +1,72 @@
+2.7.7
+=====
+
+* possibility to set `disableWithCredentials` boolean option (`false` by default) to control `withCredentials` option of `XMLHttpRequest`. See [#155](https://github.com/centrifugal/centrifuge-js/issues/155).
+
+2.7.6
+=====
+
+* `xmlhttprequest` option to explicitly pass XMLHttpRequest (for NodeJS environment)
+
+2.7.5
+=====
+
+* Fix regression of 2.7.4 - `Unexpected end of JSON input`
+
+2.7.4
+=====
+
+* Optimize & simplify json encode/decode, see [#138](https://github.com/centrifugal/centrifuge-js/pull/138)
+
+2.7.3
+=====
+
+* `SubscribeSuccessContext` can contain `data` field if custom data returned from a server in a subscribe result.
+
+2.7.2
+=====
+
+* Handle server-side SUB push in Protobuf case (previously ignored). Sub push is a message that contains information about server-side subscription made after connection already established.
+
+2.7.1
+=====
+
+* Fix type definitions - see [#133](https://github.com/centrifugal/centrifuge-js/pull/133)
+
+2.7.0
+=====
+
+* add missing `offset` to TS definitions for `PublicationContext`, note that `seq` and `gen` fields considered deprecated and will go away with next major `centrifuge-js` release
+* add top-level methods: `history`, `presence`, `presenceStats` – those are useful when using sever-side subscriptions
+* fix wrong error format of top-level `publish` Promise reject branch – it now contains protocol error object (with `code` and `message` fields)
+* possibility to set `name` and `version` protocol fields over Centrifuge config options
+* remove unused `promise` option from configuration
+* add history iteration API (usage limited to Centrifuge library for Go at the moment) - see example below
+* subscribe success event context in positioned subscriptions (added in Centrifuge library [v0.15.0](https://github.com/centrifugal/centrifuge/releases/tag/v0.15.0)) now contains `streamPosition` object (with current `offset` and `epoch` fields)
+* updated `protobuf-js` dependency (now `^6.10.2`)
+* all dev-dependencies updated and now use the latest versions of webpack, babel, eslint, mocha etc
+* internal code refactoring of Subscrption methods - code is simplified and more reusable now
+
+Let's look at history pagination feature in more detail. It's now possible to iterate over channel  history this way:
+
+```javascript
+resp = await subscription.history({'since': {'offset': 2, 'epoch': 'xcf4w'}, limit: 100});
+```
+
+If server can't fulfill a query for history (due to stream retention - size or expiration, or malformed offset, or stream already has another epoch) then an Unrecoverable Position Error will be returned (code `112`).
+
+To only call for current `offset` and `epoch` use:
+
+```javascript
+resp = await subscription.history({limit: 0});
+```
+
+I.e. not providing `since` and using zero `limit`.
+
+Due to backward compatibility `history` call without arguments will return full existing history in channel (though it's possible to limit max number of publications to return on server side).
+
+**For now history pagination feature only works with [Centrifuge](https://github.com/centrifugal/centrifuge) library based server and not available in Centrifugo**.
+
 2.6.4
 =====
 

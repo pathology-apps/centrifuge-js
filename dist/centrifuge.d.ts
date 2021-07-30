@@ -37,7 +37,10 @@ declare class Centrifuge extends EventEmitter {
     rpc(data: any): Promise<any>;
     namedRPC(method: string, data: any): Promise<any>;
     send(data: any): Promise<any>;
-    publish(channel: string, data: any): Promise<any>;
+    publish(channel: string, data: any): Promise<Centrifuge.PublishResult>;
+    history(channel: string, options?: Centrifuge.HistoryOptions): Promise<Centrifuge.HistoryResult>;
+    presence(channel: string): Promise<Centrifuge.PresenceResult>;
+    presenceStats(channel: string): Promise<Centrifuge.PresenceStatsResult>;
     getSub(channel: string): Centrifuge.Subscription;
     isConnected(): boolean;
     connect(): void;
@@ -55,9 +58,11 @@ declare namespace Centrifuge {
 
     export interface Options {
         debug?: boolean;
+        name?: string;
+        version?: string;
         websocket?: any;
         sockjs?: any;
-        promise?: any;
+        xmlhttprequest?: any;
         minRetry?: number;
         maxRetry?: number;
         timeout?: number;
@@ -81,6 +86,7 @@ declare namespace Centrifuge {
         subscribeParams?: object;
         subRefreshInterval?: number;
         onPrivateSubscribe?: (ctx: SubscribePrivateContext, cb: (resp: SubscribePrivateResponse) => void) => void;
+        disableWithCredentials?: boolean;
     }
 
     export class Subscription extends EventEmitter {
@@ -88,10 +94,10 @@ declare namespace Centrifuge {
         ready(callback: (ctx: SubscribeSuccessContext) => void, errback: (ctx: SubscribeErrorContext) => void): void;
         subscribe(): void;
         unsubscribe(): void;
-        publish(data: any): Promise<any>;
+        publish(data: any): Promise<PublishResult>;
         presence(): Promise<PresenceResult>;
         presenceStats(): Promise<PresenceStatsResult>;
-        history(): Promise<HistoryResult>;
+        history(options?: HistoryOptions): Promise<HistoryResult>;
     }
 
     export interface SubscriptionEvents {
@@ -108,6 +114,7 @@ declare namespace Centrifuge {
         info?: ClientInfo;
         seq?: number;
         gen?: number;
+        offset?: number;
     }
 
     export interface ClientInfo {
@@ -125,6 +132,8 @@ declare namespace Centrifuge {
         channel: string;
         isResubscribe: boolean;
         recovered: boolean;
+        streamPosition?: StreamPosition;
+        data?: any;
     }
 
     export interface SubscribeErrorContext {
@@ -169,6 +178,9 @@ declare namespace Centrifuge {
         token: string;
     }
 
+    export interface PublishResult {
+    }
+
     export interface PresenceResult {
         presence: PresenceMap;
     }
@@ -184,5 +196,17 @@ declare namespace Centrifuge {
 
     export interface HistoryResult {
         publications: PublicationContext[];
+        offset: number;
+        epoch: string;
+    }
+
+    export interface HistoryOptions {
+        limit?: number;
+        since?: StreamPosition;
+    }
+
+    export interface StreamPosition {
+        offset: number;
+        epoch: string;
     }
 }

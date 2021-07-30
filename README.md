@@ -12,6 +12,7 @@ This client can connect to [Centrifuge](https://github.com/centrifugal/centrifug
 * [Protobuf support](#protobuf-support)
 * [Browser support](#browser-support)
 * [Using with NodeJS](#using-with-nodejs)
+* [Feature Matrix](#feature-matrix)
 
 ## Install and quick start
 
@@ -215,6 +216,12 @@ centrifuge = new Centrifuge("http://localhost:8000/connection/websocket", {
 });
 ```
 
+#### disableWithCredentials
+
+`disableWithCredentials` is a reverse boolean option for control
+[withCredentials](https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/withCredentials)
+property of XMLHttpRequest. By default `false` - i.e. `withCredentials` property is enabled.
+
 ## Client API
 
 When `Centrifuge` object properly initialized then it is ready to start communicating with server.
@@ -340,6 +347,48 @@ centrifuge.namedRPC({"input": "hello"}).then(function(res) {
     console.log('rpc result', res);
 }, function(err) {
     console.log('rpc error', err);
+});
+```
+
+#### history method
+
+Available since v2.7.0
+
+Allows to get history from a server. This is a top-level analogue of `Subscription.history` method. But accepts a channel as first argument.
+
+```javascript
+centrifuge.history("channel", {since: {offset: 0, epoch: "xyz"}, limit: 10}).then(function(resp) {
+    console.log(resp);
+}, function(err) {
+    console.log('history error', err);
+});
+```
+
+#### presence method
+
+Available since v2.7.0
+
+Allows to get presence info from a server. This is a top-level analogue of `Subscription.presence` method. But accepts a channel as first argument.
+
+```javascript
+centrifuge.presence("channel").then(function(resp) {
+    console.log(resp);
+}, function(err) {
+    console.log('presence error', err);
+});
+```
+
+#### presenceStats method
+
+Available since v2.7.0
+
+Allows to get presence stats from a server. This is a top-level analogue of `Subscription.presenceStats` method. But accepts a channel as first argument.
+
+```javascript
+centrifuge.presenceStats("channel").then(function(resp) {
+    console.log(resp);
+}, function(err) {
+    console.log('presence stats error', err);
 });
 ```
 
@@ -590,6 +639,22 @@ Format of `err` in error callback:
 
 *Note, that in order presence to work corresponding options must be enabled in server channel configuration (on top level or for channel namespace)*
 
+### presenceStats method of subscription
+
+`presenceStats` allows to get two counters from a server: number of total clients currently subscribed and number of unique users currently subscribed. Note that this information is only available if `presence` option enabled in server configuration for a channel.
+
+```javascript
+var subscription = centrifuge.subscribe("news", function(message) {
+    // handle message
+});
+
+subscription.presenceStats().then(function(resp) {
+    // presence stats data received
+}, function(err) {
+    // presence stats call failed with error
+});
+```
+
 ### history method of subscription
 
 `history` method allows to get last messages published into channel. Note that history
@@ -601,7 +666,7 @@ var subscription = centrifuge.subscribe("news", function(message) {
     // handle message
 });
 
-subscription.history().then(function(message) {
+subscription.history().then(function(response) {
         // history messages received
     }, function(err) {
         // history call failed with error
@@ -609,29 +674,50 @@ subscription.history().then(function(message) {
 });
 ```
 
-Success callback `message` format:
+Success callback `response` format:
 
 ```javascript
 {
     "publications": [
         {
-            "data": {"input": "hello2"}
+            "data": {"input": "hello2"},
+            "offset": 1
         },
         {
-            "data": {"input": "hello1"}
+            "data": {"input": "hello1"},
+            "offset": 2
         }
-    ]
+    ],
+    "offset": 2,
+    "epoch": "xcf4w"
 }
 ```
 
-Where `publications` is an array of messages published into channel.
+Where `publications` is an array of messages published into channel, `offset` is a current stream top offset (added in v2.7.0), `epoch` is a current stream epoch (added in v2.7.0).
 
-Note that also additional fields can be included in messages - `client`, `info` if those
-fields were in original messages.
+Note that also additional fields can be included in publication objects - `client`, `info` if those fields were set in original publications.
 
 `err` format – the same as for `presence` method.
 
 *Note, that in order history to work corresponding options must be enabled in server channel configuration (on top level or for channel namespace)*
+
+Starting from v2.7.0 it's possible to iterate over history stream:
+
+```javascript
+resp = await subscription.history({'since': {'offset': 2, 'epoch': 'xcf4w'}, limit: 100});
+```
+
+If server can't fulfill a query for history (due to stream retention - size or expiration, or malformed offset, or stream already has another epoch) then an Unrecoverable Position Error will be returned (code `112`).
+
+To only call for current `offset` and `epoch` use:
+
+```javascript
+resp = await subscription.history({limit: 0});
+```
+
+I.e. not providing `since` and using zero `limit`.
+
+**For now history pagination feature only works with [Centrifuge](https://github.com/centrifugal/centrifuge) library based server and not available in Centrifugo**.
 
 ### publish method of subscription
 
@@ -785,7 +871,7 @@ If you don't want to give client access to channel then just do not include it i
 
 There are also two public API methods which can help to subscribe to many private channels sending only one POST request to your web application backend: `startSubscribeBatching` and `stopSubscribeBatching`. When you `startSubscribeBatching` javascript client will collect private subscriptions until `stopSubscribeBatching()` called – and then send them all at once.
 
-As we just described when client subscribes on private channel by default AJAX request will be sent to `subscribeEndpoint` automatically if channel starts with `$`. In this case developer only needs to return proper response from server. But there is a way to override default behaviour and take full control on authorizing private channels. To do this it's possible to provide custom `onPrivateSubscribe` function in configuration options. This function will be called with all data required to authorize private channels client subscribes to and should call callback (will be provided by centrifuge-js as second argument) with authorization data when done. See our type declarations in `dist` folder to find out data format.
+As we just described when client subscribes on private channel by default AJAX request will be sent to `subscribeEndpoint` automatically if channel starts with `$`. In this case developer only needs to return proper response from server. But there is a way to override default behaviour and take full control on authorizing private channels. To do this it's possible to provide custom `onPrivateSubscribe` function in configuration options. This function will be called with all data required to authorize private channels client subscribes to and should call callback (will be provided by centrifuge-js as second argument) with authorization data when done. See our type declarations in `dist` folder to find out data format (**for `onPrivateSubscribe` it is slightly different** - like `{"status": 200, "data": {"channels": [...]}}`).
 
 ## Server-side subscriptions
 
@@ -903,3 +989,83 @@ var centrifuge = new Centrifuge('ws://localhost:8000/connection/sockjs', {
     sockjs: SockJS
 })
 ```
+
+### Custom XMLHttpRequest
+
+To work with private channels you may need to pass `XMLHttpRequest` object to library:
+
+```javascript
+const Centrifuge = require('centrifuge');
+const WebSocket = require('ws');
+const XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;
+
+var centrifuge = new Centrifuge('ws://localhost:8000/connection/websocket', {
+    websocket: WebSocket,
+    xmlhttprequest: XMLHttpRequest
+})
+```
+
+Or define XMLHttpRequest globally over `global.XMLHttpRequest = require("xmlhttprequest").XMLHttpRequest;`
+
+### Custom WebSocket constructor
+
+If you are building a client for a non-browser environment and want to pass custom headers then you can use the following approach to wrap a WebSocket constructor and let custom options to be used on connection initialization:
+
+```javascript
+var Centrifuge = require("centrifuge");
+const WebSocket = require('ws');
+
+const myWs = function (options) {
+    return class wsClass extends WebSocket {
+        constructor(...args) {
+            super(...[...args, ...[options]])
+        }
+    }
+}
+```
+
+It should be now possible to use pass your custom WebSocket constructor to `centrifuge-js` and so custom headers will be used when connecting to a server:
+
+```javascript
+var centrifuge = new Centrifuge('ws://localhost:8000/connection/websocket', {
+    websocket: myWs({ headers: { Authorization: '<token or key>' } }),
+});
+```
+
+## Feature matrix
+
+- [x] connect to server using JSON protocol format
+- [x] connect to server using Protobuf protocol format
+- [x] connect with token (JWT)
+- [ ] connect with custom header (not supported by browser API, though [possible for a non-browser target env](https://github.com/centrifugal/centrifuge-js#custom-websocket-constructor))
+- [x] automatic reconnect in case of errors, network problems etc
+- [x] an exponential backoff for reconnect
+- [x] connect and disconnect events
+- [x] handle disconnect reason
+- [x] subscribe on a channel and handle asynchronous Publications
+- [x] handle Join and Leave messages
+- [x] handle Unsubscribe notifications
+- [x] reconnect on subscribe timeout
+- [x] publish method of Subscription
+- [x] unsubscribe method of Subscription
+- [x] presence method of Subscription
+- [x] presence stats method of Subscription
+- [x] history method of Subscription
+- [x] top-level publish method
+- [x] top-level presence method
+- [x] top-level presence stats method
+- [x] top-level history method
+- [ ] top-level unsubscribe method
+- [x] send asynchronous messages to server
+- [x] handle asynchronous messages from server
+- [x] send RPC commands
+- [x] subscribe to private channels with token (JWT)
+- [x] connection token (JWT) refresh
+- [x] private channel subscription token (JWT) refresh
+- [x] handle connection expired error
+- [x] handle subscription expired error
+- [x] ping/pong to find broken connection
+- [x] message recovery mechanism for client-side subscriptions
+- [x] server-side subscriptions
+- [x] message recovery mechanism for server-side subscriptions
+- [x] history stream pagination
